@@ -1,13 +1,21 @@
 from fastapi import FastAPI
 
-app = FastAPI()
+from app.routers import categories, products
+
+app = FastAPI(
+    title="Интернет магазин",
+    version="0.1.0",
+)
+
+# Маршруты
+app.include_router(categories.router)
+app.include_router(products.router)
 
 
+# Корневой эндпоинт для проверки
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
-
-
-@app.get("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
+    """
+    Корневой маршрут, подтверждающий, что API работает.
+    """
+    return {"message": "Добро пожаловать в API интернет-магазина!"}
