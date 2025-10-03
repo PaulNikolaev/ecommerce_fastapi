@@ -116,8 +116,21 @@ async def update_product(product_id: int, product: ProductCreate, db: Session = 
 
 
 @router.delete("/{product_id}")
-async def delete_product(product_id: int):
+async def delete_product(product_id: int, db: Session = Depends(get_db)):
     """
-    Удаляет товар по его ID.
+    Удаляет товар по его ID (логическое удаление).
     """
-    return {"message": f"Товар {product_id} удалён (заглушка)"}
+    # Проверяем, существует ли активный товар
+    product = db.scalars(
+        select(ProductModel).where(ProductModel.id == product_id, ProductModel.is_active == True)
+    ).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Product not found or inactive")
+
+
+    # Изменяем объект устанавив is_active=False и сохраняем
+    product.is_active = False
+    db.commit()
+
+    return {"status": "Успех", "message": "Продукт отмечен как неактивная"}
