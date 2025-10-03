@@ -18,7 +18,10 @@ async def get_all_products(db: Session = Depends(get_db)):
     """
     Возвращает список всех товаров.
     """
-    products = db.scalars(select(ProductModel).where(ProductModel.is_active == True)).all()
+    products = db.scalars(
+        select(ProductModel).join(CategoryModel).where(ProductModel.is_active == True,
+                                                       CategoryModel.is_active == True,
+                                                       ProductModel.stock > 0)).all()
     return products
 
 
@@ -39,12 +42,26 @@ async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     return db_product
 
 
-@router.get("/category/{category_id}")
-async def get_products_by_category(category_id: int):
+@router.get("/category/{category_id}", response_model=list[ProductSchema])
+async def get_products_by_category(category_id: int, db: Session = Depends(get_db)):
     """
-    Возвращает список товаров в указанной категории по её ID.
+    Возвращает список активных товаров в указанной категории по её ID.
     """
-    return {"message": f"Товары в категории {category_id} (заглушка)"}
+    # Проверяем, существует ли активная категория
+    category = db.scalars(
+        select(CategoryModel).where(CategoryModel.id == category_id,
+                                    CategoryModel.is_active == True)
+    ).first()
+    if not category:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Category not found or inactive")
+
+    # Получаем активные товары в категории
+    products = db.scalars(
+        select(ProductModel).where(ProductModel.category_id == category_id,
+                                   ProductModel.is_active == True)
+    ).all()
+    return products
 
 
 @router.get("/{product_id}")
