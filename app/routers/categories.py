@@ -16,12 +16,12 @@ router = APIRouter(
 
 
 @router.get("/", response_model=list[CategorySchema])
-async def get_all_categories(db: Session = Depends(get_db)):
+async def get_all_categories(db: AsyncSession = Depends(get_async_db)):
     """
     Возвращает список всех категорий товаров.
     """
-    stmt = select(CategoryModel).where(CategoryModel.is_active == True)
-    categories = db.scalars(stmt).all()
+    result = await db.scalars(select(CategoryModel).where(CategoryModel.is_active == True))
+    categories = result.all()
     return categories
 
 
@@ -37,7 +37,7 @@ async def create_category(category: CategoryCreate, db: AsyncSession = Depends(g
         result = await db.scalars(stmt)
         parent = result.first()
         if parent is None:
-            raise HTTPException(status_code=400, detail="Parent category not found")
+            raise HTTPException(status_code=400, detail="Родительская категория не найдена")
 
     # Создание новой категории
     db_category = CategoryModel(**category.model_dump())
