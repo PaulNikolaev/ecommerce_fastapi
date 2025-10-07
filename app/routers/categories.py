@@ -48,30 +48,32 @@ async def create_category(category: CategoryCreate, db: AsyncSession = Depends(g
 
 
 @router.put("/{category_id}", response_model=CategorySchema)
-async def update_category(category_id: int, category: CategoryCreate, db: Session = Depends(get_db)):
+async def update_category(category_id: int, category: CategoryCreate, db: AsyncSession = Depends(get_async_db)):
     """
     Обновляет категорию по её ID.
     """
     stmt = select(CategoryModel).where(CategoryModel.id == category_id,
                                        CategoryModel.is_active == True)
-    db_category = db.scalars(stmt).first()
+    result = await db.scalars(stmt)
+    db_category = result.first()
     if db_category is None:
         raise HTTPException(status_code=404, detail="Категория не найдена")
 
     if category.parent_id is not None:
         parent_stmt = select(CategoryModel).where(CategoryModel.id == category.parent_id,
                                                   CategoryModel.is_active == True)
-        parent = db.scalars(parent_stmt).first()
+        parent_result = await db.scalars(parent_stmt)
+        parent = parent_result.first()
         if parent is None:
             raise HTTPException(status_code=404, detail="Родительская категория не найдена")
 
-    db.execute(
+    update_data = category.model_dump(exclude_unset=True)
+    await db.execute(
         update(CategoryModel).
         where(CategoryModel.id == category_id).
-        values(**category.model_dump())
+        values(**update_data)
     )
-    db.commit()
-    db.refresh(db_category)
+    await db.commit()
     return db_category
 
 
