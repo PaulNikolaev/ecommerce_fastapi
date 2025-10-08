@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.products import Product as ProductModel
 from app.models.categories import Category as CategoryModel
 from app.schemas import Product as ProductSchema, ProductCreate
 from app.db_depends import get_db
+from app.db_depends import get_async_db
 
 router = APIRouter(
     prefix="/products",
@@ -14,54 +16,55 @@ router = APIRouter(
 
 
 @router.get("/", response_model=list[ProductSchema])
-async def get_all_products(db: Session = Depends(get_db)):
+async def get_all_products(db: AsyncSession = Depends(get_async_db)):
     """
     Возвращает список всех товаров.
     """
-    products = db.scalars(
+    result = await db.scalars(
         select(ProductModel).join(CategoryModel).where(ProductModel.is_active == True,
                                                        CategoryModel.is_active == True,
-                                                       ProductModel.stock > 0)).all()
-    return products
+                                                       ProductModel.stock > 0))
+
+    return result.all()
 
 
 @router.post("/", response_model=ProductSchema, status_code=status.HTTP_201_CREATED)
-async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+async def create_product(product: ProductCreate, db: AsyncSession = Depends(get_async_db)):
     """
     Создаёт новый товар.
     """
-    category = db.scalars(select(CategoryModel).where(CategoryModel.id == product.category_id,
-                                                      CategoryModel.is_active == True)).first()
+    category_result = await db.scalars(select(CategoryModel).where(CategoryModel.id == product.category_id,
+                                                      CategoryModel.is_active == True))
+    category = category_result.first()
     if not category:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Категория не найдена или не активна")
     db_product = ProductModel(**product.model_dump())
     db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
+    await db.commit()
+    await db.refresh(db_product)
     return db_product
 
 
 @router.get("/category/{category_id}", response_model=list[ProductSchema])
-async def get_products_by_category(category_id: int, db: Session = Depends(get_db)):
+async def get_products_by_category(category_id: int, db: AsyncSession = Depends(get_async_db)):
     """
     Возвращает список активных товаров в указанной категории по её ID.
     """
     # Проверяем, существует ли активная категория
-    category = db.scalars(
+    category_result = await db.scalars(
         select(CategoryModel).where(CategoryModel.id == category_id,
-                                    CategoryModel.is_active == True)
-    ).first()
+                                    CategoryModel.is_active == True))
+    category = category_result.first()
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Category not found or inactive")
 
     # Получаем активные товары в категории
-    products = db.scalars(
+    products_result = await db.scalars(
         select(ProductModel).where(ProductModel.category_id == category_id,
-                                   ProductModel.is_active == True)
-    ).all()
-    return products
+                                   ProductModel.is_active == True))
+    return products_result.all()
 
 
 @router.get("/{product_id}", response_model=ProductSchema)
