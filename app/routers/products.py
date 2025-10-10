@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.users import User as UserModel
 from app.models.products import Product as ProductModel
 from app.models.categories import Category as CategoryModel
 from app.schemas import Product as ProductSchema, ProductCreate
+from app.auth import get_current_seller
 from app.db_depends import get_async_db
 
 router = APIRouter(
@@ -27,17 +29,18 @@ async def get_all_products(db: AsyncSession = Depends(get_async_db)):
 
 
 @router.post("/", response_model=ProductSchema, status_code=status.HTTP_201_CREATED)
-async def create_product(product: ProductCreate, db: AsyncSession = Depends(get_async_db)):
+async def create_product(product: ProductCreate,
+                         db: AsyncSession = Depends(get_async_db),
+                         current_user: UserModel = Depends(get_current_seller)):
     """
     Создаёт новый товар.
     """
     category_result = await db.scalars(select(CategoryModel).where(CategoryModel.id == product.category_id,
                                                                    CategoryModel.is_active == True))
-    category = category_result.first()
-    if not category:
+    if not category_result.first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Категория не найдена или не активна")
-    db_product = ProductModel(**product.model_dump())
+    db_product = ProductModel(**product.model_dump(), seller_id=current_user.id)
     db.add(db_product)
     await db.commit()
     await db.refresh(db_product)
@@ -88,7 +91,9 @@ async def get_product(product_id: int, db: AsyncSession = Depends(get_async_db))
 
 
 @router.put("/{product_id}", response_model=ProductSchema)
-async def update_product(product_id: int, product: ProductCreate, db: AsyncSession = Depends(get_async_db)):
+async def update_product(product_id: int, product: ProductCreate,
+                         db: AsyncSession = Depends(get_async_db),
+                         current_user: UserModel = Depends(get_current_seller)):
     """
     Обновляет товар по его ID.
     """
@@ -98,6 +103,9 @@ async def update_product(product_id: int, product: ProductCreate, db: AsyncSessi
     db_product = product_result.first()
     if not db_product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    if db_product.seller_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Вы можете обновлять только свои собственные продукты")
 
     # Проверяем, существует ли активная категория
     category_result = await db.scalars(
@@ -117,7 +125,9 @@ async def update_product(product_id: int, product: ProductCreate, db: AsyncSessi
 
 
 @router.delete("/{product_id}", response_model=ProductSchema)
-async def delete_product(product_id: int, db: AsyncSession = Depends(get_async_db)):
+async def delete_product(product_id: int,
+                         db: AsyncSession = Depends(get_async_db),
+                         current_user: UserModel = Depends(get_current_seller)):
     """
     Выполняет мягкое удаление товара по его ID, устанавливая is_active = False.
     """
@@ -128,14 +138,16 @@ async def delete_product(product_id: int, db: AsyncSession = Depends(get_async_d
     product = product_result.first()
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found or inactive")
+    if product.seller_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Вы можете удалять только свои собственные продукты")
 
     # Проверяем, существует ли активная категория
     category_result = await db.scalars(
         select(CategoryModel).where(CategoryModel.id == product.category_id,
                                     CategoryModel.is_active == True)
     )
-    category = category_result.first()
-    if not category:
+    if not category_result.first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Category not found or inactive")
 
