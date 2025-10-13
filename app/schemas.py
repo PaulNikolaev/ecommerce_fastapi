@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import Optional
-
+from datetime import datetime
 
 class CategoryCreate(BaseModel):
     """
@@ -68,4 +68,29 @@ class User(BaseModel):
     email: EmailStr
     is_active: bool
     role: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReviewCreate(BaseModel):
+    """
+    Модель для создания нового отзыва.
+    """
+    product_id: int = Field(..., description="ID продукта, к которому относится отзыв")
+    comment: Optional[str] = Field(None, description="Текст отзыва (необязательно)")
+    grade: int = Field(..., ge=1, le=5, description="Оценка от 1 до 5")
+
+
+class Review(BaseModel):
+    """
+    Модель для ответа с полными данными отзыва.
+    Используется в GET и POST ответах.
+    """
+    id: int = Field(description="Уникальный идентификатор отзыва")
+    user_id: int = Field(description="ID пользователя, оставившего отзыв")
+    product_id: int = Field(description="ID продукта")
+    comment: Optional[str] = Field(None, description="Текст отзыва")
+    comment_date: datetime = Field(description="Дата и время отзыва")
+    grade: int = Field(description="Оценка от 1 до 5")
+    is_active: bool = Field(description="Активность отзыва")
+
     model_config = ConfigDict(from_attributes=True)
