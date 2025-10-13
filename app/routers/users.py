@@ -18,6 +18,12 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_async_db)
     """
     Регистрирует нового пользователя с ролью 'buyer' или 'seller'.
     """
+    if user.role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Роль 'admin' не может быть установлена через публичный эндпоинт регистрации"
+        )
+
     # Проверка уникальности email
     result = await db.scalars(select(UserModel).where(UserModel.email == user.email))
     if result.first():
