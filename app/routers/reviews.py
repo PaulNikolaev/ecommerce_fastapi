@@ -30,7 +30,7 @@ async def create_review(
     product_id = review_data.product_id
     user_id = current_user.id
 
-    # 1. Проверка существования и активности товара (404 Not Found)
+    # Проверка существования и активности товара
     product = await db.get(ProductModel, product_id)
     if not product or not product.is_active:
         raise HTTPException(
@@ -38,7 +38,24 @@ async def create_review(
             detail="Товар не найден или не активен."
         )
 
-    # 2. Создание отзыва. Валидация grade (1-5) происходит в Pydantic.
+    # Проверка: не оставлял ли пользователь уже активный отзыв на этот товар?
+    existing_review = await db.scalar(
+        select(ReviewModel).where(
+            and_(
+                ReviewModel.product_id == product_id,
+                ReviewModel.user_id == user_id,
+                ReviewModel.is_active == True
+            )
+        )
+    )
+
+    if existing_review:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Вы уже оставили активный отзыв на этот товар. Обновите или удалите его, чтобы создать новый."
+        )
+
+    # Создание отзыва.
     db_review = ReviewModel(
         **review_data.model_dump(),
         user_id=user_id
@@ -48,7 +65,7 @@ async def create_review(
     await db.commit()
     await db.refresh(db_review)
 
-    # 3. Пересчёт рейтинга товара
+    # Пересчёт рейтинга товара
     await update_product_rating(db, product_id)
 
     return db_review
