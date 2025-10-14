@@ -105,3 +105,35 @@ async def create_review(
     await update_product_rating(db, product_id)
 
     return db_review
+
+
+@router.delete("/{review_id}", status_code=status.HTTP_200_OK)
+async def delete_review(
+        review_id: int,
+        db: AsyncSession = Depends(get_async_db),
+        current_user: UserModel = Depends(get_current_admin)
+):
+    """
+    Выполняет мягкое удаление отзыва (is_active = False) и пересчитывает рейтинг товара.
+    Доступ: admin.
+    """
+    # Находим активный отзыв
+    review = await db.get(ReviewModel, review_id)
+
+    if not review or not review.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Отзыв не найден или уже не активен."
+        )
+
+    product_id = review.product_id
+
+    # Мягкое удаление
+    review.is_active = False
+    await db.commit()
+
+    # 3. Пересчёт рейтинга товара
+    await update_product_rating(db, product_id)
+
+    # Возвращаем 204 No Content
+    return review
