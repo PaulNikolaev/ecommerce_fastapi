@@ -28,6 +28,31 @@ async def get_all_reviews(db: AsyncSession = Depends(get_async_db)):
     return result.all()
 
 
+@router.get("/{product_id}/reviews/", response_model=list[ReviewSchema])
+async def get_reviews_for_product(product_id: int, db: AsyncSession = Depends(get_async_db)):
+    """
+    Возвращает список активных отзывов для указанного товара.
+    """
+    # Проверка существования и активности товара
+    product = await db.get(ProductModel, product_id)
+    if not product or not product.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Товар не найден или не активен."
+        )
+
+    # Получение активных отзывов
+    result = await db.scalars(
+        select(ReviewModel)
+        .where(
+            ReviewModel.product_id == product_id,
+            ReviewModel.is_active == True
+        )
+        .order_by(ReviewModel.comment_date.desc())
+    )
+    return result.all()
+
+
 @router.post("/", response_model=ReviewSchema, status_code=status.HTTP_201_CREATED)
 async def create_review(
         review_data: ReviewCreate,
