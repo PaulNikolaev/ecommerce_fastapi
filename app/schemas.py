@@ -54,7 +54,7 @@ class Product(BaseModel):
     stock: int = Field(description="Количество товара на складе")
     category_id: int = Field(description="ID категории")
     is_active: bool = Field(description="Активность товара")
-
+    rating: float = Field(default=0.0, description="Средний рейтинг товара (от 0.0 до 5.0)")
     model_config = ConfigDict(from_attributes=True)
 
 
