@@ -17,6 +17,17 @@ router = APIRouter(
 )
 
 
+@router.get("/", response_model=list[ReviewSchema])
+async def get_all_reviews(db: AsyncSession = Depends(get_async_db)):
+    """
+    Возвращает список всех активных отзывов
+    """
+    result = await db.scalars(
+        select(ReviewModel).where(ReviewModel.is_active == True).order_by(ReviewModel.comment_date.desc())
+    )
+    return result.all()
+
+
 @router.post("/", response_model=ReviewSchema, status_code=status.HTTP_201_CREATED)
 async def create_review(
         review_data: ReviewCreate,
