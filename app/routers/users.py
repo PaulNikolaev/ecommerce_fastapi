@@ -4,7 +4,7 @@ from sqlalchemy import select
 from fastapi.security import OAuth2PasswordRequestForm
 import jwt
 
-from app.config import SECRET_KEY, ALGORITHM
+from app.config import settings
 from app.models.users import User as UserModel
 from app.schemas import UserCreate, User as UserSchema
 from app.db_depends import get_async_db
@@ -71,7 +71,7 @@ async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_async
                                           detail="Не удалось проверить токен обновления",
                                           headers={"WWW-Authenticate": "Bearer"}, )
     try:
-        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception

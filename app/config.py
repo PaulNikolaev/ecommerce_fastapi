@@ -1,7 +1,19 @@
 import os
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-load_dotenv()
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = "HS256"
+# Pydantic Settings автоматически ищет и загружает .env файл
+class Settings(BaseSettings):
+    # Указываем, что нужно искать файл .env в текущей директории
+    model_config = SettingsConfigDict(env_file='.env', extra='ignore')
+
+    # Основные настройки FastAPI
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+
+    # Настройки базы данных
+    DATABASE_URL: str
+
+
+# Создаем единственный экземпляр настроек, который будет использоваться во всем приложении
+settings = Settings()
